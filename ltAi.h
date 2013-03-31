@@ -13,7 +13,7 @@ public:
 
 	virtual ~LtAi(void);
 
-	int initBase();
+	int load_item(const char* dbAddr, const char* dbName);
 
 	vector<Lottory>& getHis()
 	{
@@ -21,6 +21,9 @@ public:
 	}
 
 	int getRand(Lottory& item);
+
+private:
+	int _initBase();
 
 private:
 	vector<Lottory> _ltHis;
