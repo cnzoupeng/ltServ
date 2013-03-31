@@ -126,8 +126,8 @@ int main(int argc, char* argv[])
 		daemonize();
 	}	
 
-	LtAi aiCore;
-	if (aiCore.load_item(DB_ADDR, DB_NAME) < 0)
+	LtAi aiCore(DB_ADDR, DB_NAME);
+	if (aiCore.load_history() < 0)
 	{
 		return -1;
 	}

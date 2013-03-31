@@ -9,7 +9,9 @@
 
 using namespace mongo;
 
-LtAi::LtAi(void)
+LtAi::LtAi(const char* dbAddr, const char* dbName)
+	: _dbAddr(dbAddr)
+	, _dbName(dbName)
 {
 	_ltBase = NULL;
 	_ltBaseCount = 0;
@@ -21,7 +23,7 @@ LtAi::~LtAi(void)
 
 }
 
-int LtAi::load_item(const char* dbAddr, const char* dbName)
+int LtAi::load_history()
 {
 	char ltIdBuf[32];
 	Lottory item;
@@ -30,15 +32,18 @@ int LtAi::load_item(const char* dbAddr, const char* dbName)
 	mongo::Query qSort;
 	int err = 0;
 
+	//«Âø’
+	_ltHis.clear();
+
 	mongo::DBClientConnection dbCon;
-	if(!dbCon.connect(dbAddr, errMsg))
+	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
 	{
-		LogErr("Connect to db %s failed: %s\n", dbAddr, errMsg.c_str());
+		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
 		return -1;
 	}
 
 	qSort.sort("id", 1);
-	std::auto_ptr<DBClientCursor> cursor = dbCon.query(dbName , qSort);	
+	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbName , qSort);	
 	while ( cursor->more())
 	{
 		BSONObj obj = cursor->next();
@@ -67,6 +72,63 @@ int LtAi::load_item(const char* dbAddr, const char* dbName)
 	}
 
 	LogMsg("Load %u History items\n", (u32)_ltHis.size());
+	return 0;
+}
+
+int LtAi::update_history()
+{
+	char ltIdBuf[32];
+	Lottory item;
+	string strItem;	
+	string errMsg;
+	mongo::Query qSort;
+	int err = 0;
+	int updateCount = 0;
+
+	Lottory curLast =  _ltHis.back();
+
+	mongo::DBClientConnection dbCon;
+	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
+	{
+		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
+		return -1;
+	}
+
+	//Ωµ–Ú≈≈¡–
+	qSort.sort("id", -1);
+	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbName , qSort);	
+	while ( cursor->more())
+	{
+		BSONObj obj = cursor->next();
+		u32 objId = (u32)obj.getIntField("id");
+
+		if (objId > curLast.no)
+		{
+			sprintf(ltIdBuf, "%d ", objId);
+			strItem = ltIdBuf;
+			strItem += obj.getStringField("num");
+			if (item.Set(strItem) < 0)
+			{
+				err = -1;
+				break;
+			}
+			_ltHis.push_back(item);
+			LogMsg("Update: %s\n", strItem.c_str());
+			updateCount ++;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	if (err != 0)
+	{
+		_ltHis.clear();
+		return err;
+	}
+
+	LogMsg("%d records update\n", updateCount);
 	return 0;
 }
 

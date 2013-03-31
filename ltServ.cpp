@@ -43,6 +43,7 @@ int LtServ::_rand_build(vector<string>& args, char* outMsg, int* outLen)
 		strcat(outMsg + CMD_RES_LEN, ":");
 		int msgOutLen = strlen(outMsg);
 		item.toString(outMsg + msgOutLen, *outLen - msgOutLen);
+		strcat(outMsg, "\n");
 	}	
 	
 	LogDbg("Rand: %s\n", outMsg + CMD_RES_LEN);
@@ -50,11 +51,27 @@ int LtServ::_rand_build(vector<string>& args, char* outMsg, int* outLen)
 	return 0;
 }
 
+int LtServ::_update_history(vector<string>& args, char* outMsg, int* outLen)
+{
+	strcpy(outMsg, CMD_RES);
+
+	if (_ltAi.update_history() < 0)
+	{
+		strcat(outMsg, ":1\n");
+	}
+	else
+	{
+		strcat(outMsg, ":0\n");
+	}
+
+	*outLen = strlen(outMsg);
+	return 0;
+}
+
 int LtServ::_recv_msg(char* msgRecv, int recvLen, char* outMsg, int* outLen)
 {
 	assert(msgRecv != NULL);
-	assert(outMsg != NULL);
-	
+	assert(outMsg != NULL);	
 
 	if (recvLen <= CMD_REQ_LEN + 1)
 	{
@@ -87,6 +104,11 @@ int LtServ::_recv_msg(char* msgRecv, int recvLen, char* outMsg, int* outLen)
 	if(request[0] == "RAND")
 	{
 		return _rand_build(request, outMsg, outLen);
+	}
+
+	if (request[0] == "UPDATE")
+	{
+		return _update_history(request, outMsg, outLen);
 	}
 
 	LogErr("Recv wrong Msg: %s\n", recv.c_str());

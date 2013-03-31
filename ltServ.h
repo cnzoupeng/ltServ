@@ -27,6 +27,8 @@ private:
 
 	int _rand_build(vector<string>& args, char* outMsg, int* outLen);
 
+	int _update_history(vector<string>& args, char* outMsg, int* outLen);
+
 private:
 	string  _ip;
 	u16		_port;
