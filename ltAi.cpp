@@ -9,9 +9,9 @@
 
 using namespace mongo;
 
-LtAi::LtAi(const char* dbAddr, const char* dbName)
-	: _dbAddr(dbAddr)
-	, _dbName(dbName)
+LtAi::LtAi()
+	: _dbAddr(DB_ADDR)
+	, _dbName(DB_HISTORY_NAME)
 {
 	_ltBase = NULL;
 	_ltBaseCount = 0;
@@ -96,7 +96,8 @@ int LtAi::update_history()
 
 	//Ωµ–Ú≈≈¡–
 	qSort.sort("id", -1);
-	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbName , qSort);	
+	qSort.minKey(BSONObjBuilder().append("id", curLast.no + 1).obj());
+	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbName , qSort);
 	while ( cursor->more())
 	{
 		BSONObj obj = cursor->next();

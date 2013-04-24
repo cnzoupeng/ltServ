@@ -35,16 +35,16 @@ int LtServ::_rand_build(vector<string>& args, char* outMsg, int* outLen)
 			return 0;
 		}
 	}
+	strcat(outMsg, ":0");
 
 	for(int i = 0; i < count; i++)
 	{
 		Lottory item;
 		_ltAi.getRand(item);
-		strcat(outMsg + CMD_RES_LEN, ":");
+		strcat(outMsg + strlen(outMsg), ":");
 		int msgOutLen = strlen(outMsg);
 		item.toString(outMsg + msgOutLen, *outLen - msgOutLen);
-		strcat(outMsg, "\n");
-	}	
+	}
 	
 	LogDbg("Rand: %s\n", outMsg + CMD_RES_LEN);
 	*outLen = strlen(outMsg);

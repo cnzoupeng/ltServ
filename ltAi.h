@@ -10,9 +10,11 @@ using namespace std;
 class LtAi
 {
 public:
-	LtAi(const char* dbAddr, const char* dbName);
-
-	virtual ~LtAi(void);
+	static LtAi& getInst()
+	{
+		static LtAi ai;
+		return ai;
+	}
 
 	int load_history();
 
@@ -26,6 +28,11 @@ public:
 	int getRand(Lottory& item);
 
 private:
+
+	LtAi();
+
+	virtual ~LtAi(void);
+
 	int _initBase();
 
 private:

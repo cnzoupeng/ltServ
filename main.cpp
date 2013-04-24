@@ -12,14 +12,10 @@
 #include "cmRandom.h"
 #include "ltAi.h"
 #include "ltServ.h"
+#include "httpClient.h"
+#include "numUpdate.h"
 
 using namespace std;
-
-
-#define DB_ADDR			"localhost"
-#define DB_NAME			"ssq.number"
-#define LISTEN_IP		"127.0.0.1"
-#define LISTEN_PORT		6666
 
 
 void help_exit()
@@ -74,17 +70,6 @@ void daemonize(void)
 
 void rand_test()
 {
-	// 	for(int i = 0; i < 100; i ++)
-	// 	{
-	// 		printf("%-10u  %-10u %-10u %-10u %-10u\n", 
-	// 			CmRandom::getUint(),
-	// 			CmRandom::getUint(),
-	// 			CmRandom::getUint(),
-	// 			CmRandom::getUint(),
-	// 			CmRandom::getUint()
-	// 			);
-	// 	}
-
 	const u32 MAX_X = 0xFFFFFFFF;
 	u32 countPt[10];
 	for(int i = 0; i < 10; i++)
@@ -115,9 +100,12 @@ void rand_test()
 	exit(0);
 }
 
+
 int main(int argc, char* argv[]) 
 {
 	dbgOn = LOG_LV_ERR | LOG_LV_MSG | LOG_LV_DBG;
+
+
 
 	parse_cmd(argc, argv);
 
@@ -126,11 +114,14 @@ int main(int argc, char* argv[])
 		daemonize();
 	}	
 
-	LtAi aiCore(DB_ADDR, DB_NAME);
+	LtAi& aiCore = LtAi::getInst();
 	if (aiCore.load_history() < 0)
 	{
 		return -1;
 	}
+
+	NumUpdate& numup = NumUpdate::getInst();
+	numup.runBack();
 
 	LtServ serv(LISTEN_IP, LISTEN_PORT, aiCore);
 	serv.run_loop();

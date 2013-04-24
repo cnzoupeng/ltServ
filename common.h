@@ -3,11 +3,21 @@
 #define __COMMON_H__
 
 #include <cstdio>
+#include <string>
+#include <vector>
 
 typedef unsigned char		u8;
 typedef	unsigned short		u16;
 typedef unsigned int		u32;
 typedef unsigned long long	u64;
+
+
+#define DB_ADDR				"localhost"
+#define DB_HISTORY_NAME		"ssq.history"
+#define DB_RAND_NAME		"ssq.rand"
+#define LISTEN_IP			"0.0.0.0"
+#define LISTEN_PORT			6666
+#define RAND_PER_COUNT		5
 
 
 #define LOG_LV_ERR	0x01
@@ -22,7 +32,7 @@ extern int dbgOn;
 
 u8	bit_count(u8 u);
 u32	bit_count(u64 u);
-
+void my_split(std::string& str,const char* delim, std::vector<std::string>& out);
 
 
 #endif //__COMMON_H__
