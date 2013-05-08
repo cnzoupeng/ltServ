@@ -6,8 +6,6 @@
 #include <cerrno>
 #include <cassert>
 #include <time.h>
-#include "mongo/client/dbclient.h"
-#include <boost/algorithm/string.hpp>
 #include "httpClient.h"
 #include "ltAi.h"
 
@@ -44,18 +42,12 @@ int NumUpdate::get_last_id_from_db(int& lastId)
 {
 	string errMsg;
 	string strItem;
-	DBClientConnection dbCon;
-	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
-	{
-		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
-		return -1;
-	}
 
 	Lottory item;
 	char ltIdBuf[32];
 	mongo::Query qSort;
 	qSort.sort("id", -1);
-	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbHisName , qSort, 1);	
+	std::auto_ptr<DBClientCursor> cursor = _dbCon.query(_dbHisName , qSort, 1);	
 	if (cursor->more())
 	{
 		BSONObj obj = cursor->next();
@@ -95,7 +87,8 @@ int NumUpdate::get_last_id_from_html(string& page, int& lastId)
 		return -1;
 	}
 	int pos = result.begin() - strTmp.begin() + 1;
-	string strVal = strTmp.substr(pos, 5);
+	string strVal("20");
+	strVal += strTmp.substr(pos, 5);
 	lastId = atoi(strVal.c_str());
 
 	LogMsg("Get last id: %d\n", lastId);
@@ -154,7 +147,7 @@ int NumUpdate::get_item_from_page(string& page, vector<string>& items)
 			continue;
 		}
 
-		string itemVal;
+		string itemVal("20");
 		char val[64];
 		int err = 0;
 		for (int i = 2; i < 10; i++)
@@ -164,6 +157,7 @@ int NumUpdate::get_item_from_page(string& page, vector<string>& items)
 				err = 1;
 				break;
 			}
+			
 			itemVal += val;
 			if (i < 9)
 			{
@@ -184,53 +178,84 @@ int NumUpdate::save_item_to_db(vector<string>& items)
 	string errMsg;
 	char strItem[128];
 	char strTmp[128];
-	vector<BSONObj> vecObj;
-	DBClientConnection dbCon;
+	char idStr[64];
+	char valStr[64];
+	int curId = 0;
+	int err = 0;
+	string dberr;
 
-	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
-	{
-		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
-		return -1;
-	}
+	LtAi& ltAi = LtAi::getInst();
 
+	//保存历史记录
 	for (u32 i = 0; i< items.size(); i++)
 	{
 		strcpy(strItem, items[i].c_str());
-		strItem[5] = 0;
-		sprintf(strTmp, "{id:20%s, num:\"%s\"}", strItem, &strItem[6]);
-		vecObj.push_back(fromjson(strTmp));
+		strItem[7] = 0;
+		curId = atoi(strItem) ;
+		sprintf(strTmp, "{id:%d, num:\"%s\"}", curId, &strItem[8]);
+
+		//插入历史记录
+		_dbCon.resetError();
+		_dbCon.insert(_dbHisName, fromjson(strTmp));
+		dberr = _dbCon.getLastError();
+		if (!dberr.empty())
+		{
+			LogErr("Insert History Err:%s\n", dberr.c_str());
+			err = 1;
+			continue;;
+		}
+		LogDbg("Insert %d success\n", curId);
+
+		//通知AI更新数据		
+		ltAi.update_history(items[i]);
+		
+		//生成下期的预测
+		if (generate_new_rand(curId) < 0)
+		{
+			LogErr("generate_new_rand failed\n");
+			err = 1;
+			continue;
+		}
+
+		//更新当前期的预测记录
+		sprintf(idStr, "{id:%d}", curId);
+		sprintf(valStr, "{real:\"%s\"}", &strItem[8]);
+
+		BSONObj obVal = fromjson(valStr);
+		_dbCon.update(_dbRandName, fromjson(idStr), BSON("$set"<<obVal), false);
+
+		dberr = _dbCon.getLastError();
+		if (!dberr.empty())
+		{
+			LogErr("Update Rand real Err:%s\n", dberr.c_str());
+			err = 1;
+			continue;;
+		}
 	}
 
-	dbCon.resetError();
-	dbCon.insert(_dbHisName, vecObj);
-	string err = dbCon.getLastError();
-	if (!err.empty())
+	if (err == 0)
 	{
-		LogErr("Insert History Err:%s\n", err.c_str());
-		return -1;
-	}
-
-	LogMsg("Insert History %u items to db Success\n", (u32)vecObj.size());
-	return 0;
+		LogMsg("Insert History %u items to db Success\n", (u32)items.size());
+	}	
+	return err;
 }
 
 int NumUpdate::generate_new_rand(int lastId)
 {
 	string errMsg;
 	vector<BSONObj> vecObj;
-	DBClientConnection dbCon;
-
-	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
-	{
-		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
-		return -1;
-	}
 
 	char idStr[32];
 	char newRand[512];
 	LtAi& ltAi = LtAi::getInst();
 	Lottory item[RAND_PER_COUNT];
-	int len = sprintf(newRand, "{id:%d ,nums:\"", lastId + 1);
+
+	time_t curTm = time(NULL);
+	struct tm* lcTm = ::localtime(&curTm);
+	lcTm->tm_year += 1900;
+
+	int len = sprintf(newRand, "{id:%d , time:\"%d-%d-%d %d:%d:%d\", nums:\"", lastId + 1,
+		lcTm->tm_year, lcTm->tm_mon, lcTm->tm_mday, lcTm->tm_hour, lcTm->tm_min, lcTm->tm_sec);
 
 	for(int i = 0; i < RAND_PER_COUNT; i++)
 	{		
@@ -250,10 +275,10 @@ int NumUpdate::generate_new_rand(int lastId)
 	}
 	sprintf(newRand + len, "\"}");
 	sprintf(idStr, "{id: %d}", lastId + 1);
-	dbCon.resetError();
-	dbCon.update(_dbRandName, fromjson(idStr), fromjson(newRand), true);
-	//dbCon.insert(_dbRandName, fromjson(newRand));
-	string err = dbCon.getLastError();
+	_dbCon.resetError();
+	_dbCon.update(_dbRandName, fromjson(idStr), fromjson(newRand), true);
+	
+	string err = _dbCon.getLastError();
 	if (!err.empty())
 	{
 		LogErr("Insert Rand Err:%s\n", err.c_str());
@@ -267,8 +292,7 @@ int NumUpdate::generate_new_rand(int lastId)
 int NumUpdate::dbInit()
 {
 	string errMsg;
-	DBClientConnection dbCon;
-	if(!dbCon.connect(_dbAddr.c_str(), errMsg))
+	if(!_dbCon.connect(_dbAddr.c_str(), errMsg))
 	{
 		LogErr("Connect to db %s failed: %s\n", _dbAddr.c_str(), errMsg.c_str());
 		return NULL;
@@ -278,7 +302,7 @@ int NumUpdate::dbInit()
 	bob.append("id", -1);
 	bob.append("unique", 1);
 
-	if(!dbCon.ensureIndex(_dbHisName, bob.obj()))
+	if(!_dbCon.ensureIndex(_dbHisName, bob.obj()))
 	{
 		LogErr("ensureIndex %s failed: %s\n", _dbHisName.c_str(), errMsg.c_str());
 		return NULL;
@@ -288,14 +312,14 @@ int NumUpdate::dbInit()
 	BSONObjBuilder bob2;
 	bob2.append("id", -1);
 	bob2.append("unique", 1);
-	if(!dbCon.ensureIndex(_dbRandName, bob2.obj()))
+	if(!_dbCon.ensureIndex(_dbRandName, bob2.obj()))
 	{
 		LogErr("ensureIndex %s failed: %s\n", _dbRandName.c_str(), errMsg.c_str());
 		return NULL;
 	}
 	LogDbg("ensureIndex: %s\n", _dbRandName.c_str());
 
-	dbCon.update(_dbHisName, fromjson("{id: 2003001}"), fromjson("{id: 2003001, num: \"10 11 12 13 26 28 11\"}"), true);
+	_dbCon.update(_dbHisName, fromjson("{id: 2003001}"), fromjson("{id: 2003001, num: \"10 11 12 13 26 28 11\"}"), true);
 	LogDbg("insert first History: 2003001\n");
 	LogMsg("Db init success\n");
 
@@ -306,12 +330,12 @@ void* NumUpdate::run(void* arg)
 {	
 	HttpClient http;
 	string page;
-	char url[128];
-	bool runFirst = true;
+	char url[128];	
 	vector<string> newItems;
 	int webLastId, dbLastId;
 	assert(arg != NULL);
 	NumUpdate& numUp = *(NumUpdate*)arg;
+	bool runFirst = true, runFailed = false;
 
 	if (numUp.dbInit() < 0)
 	{
@@ -324,75 +348,81 @@ void* NumUpdate::run(void* arg)
 	{
 		if (!runFirst)
 		{
-			time_t curTm = time(NULL);
-			struct tm* lcTm = ::localtime(&curTm);
-			if ((lcTm->tm_wday == 2 || lcTm->tm_wday == 4 || lcTm->tm_wday == 6)
-				&& (lcTm->tm_hour > 21 && lcTm->tm_hour < 23))
+			if (runFailed)
 			{
-				sleep(10 * 60);
+				LogDbg("Sleep 10\n");
+				sleep(10);
 			}
 			else
 			{
-				sleep(60 * 60);
+				time_t curTm = time(NULL);
+				struct tm* lcTm = ::localtime(&curTm);
+				if ((lcTm->tm_wday == 2 || lcTm->tm_wday == 4 || lcTm->tm_wday == 6)
+					&& (lcTm->tm_hour > 21 && lcTm->tm_hour < 23))
+				{
+					LogDbg("Sleep 10 * 60\n");
+					sleep(10 * 60);
+				}
+				else
+				{
+					LogDbg("Sleep 60 * 60\n");
+					sleep(60 * 60);
+				}
 			}
 		}
 		runFirst = false;
 
- 		page.clear();
- 		if(http.getPage("datachart.500.com", "/ssq/history/inc/history_same.php", page) != 0)
+		page.clear();
+		if(http.getPage("datachart.500.com", "/ssq/history/inc/history_same.php", page) != 0)
 		{
 			LogErr("getPage failed:/ssq/history/inc/history_same.php\n");
+			runFailed = true;
 			continue;
 		}
 
 		if (numUp.get_last_id_from_db(dbLastId) < 0)
 		{
 			LogErr("get_last_id_from_db failed");
+			runFailed = true;
 			continue;
 		}
 
 		if (numUp.get_last_id_from_html(page, webLastId) < 0)
 		{
 			LogErr("get_last_id_from_html failed");
+			runFailed = true;
 			continue;
 		}
 
-		dbLastId -= 2000000;
 		if (webLastId <= (dbLastId + 1))
 		{
-			LogMsg("DB Last=%d WEB Last=%d\n", dbLastId + 2000000, webLastId + 2000000);
+			LogMsg("DB Last=%d WEB Last=%d\n", dbLastId, webLastId  - 1);
+			runFailed = false;
 			continue;
 		}
 		
 		page.clear();
-		sprintf(url, "/ssq/history/inc/history_same.php?start=%d&end=%d", dbLastId + 1, webLastId);		
+		sprintf(url, "/ssq/history/inc/history_same.php?start=%d&end=%d", dbLastId + 1 - 2000000, webLastId - 2000000);		
 		if(http.getPage("datachart.500.com", url, page) != 0)
 		{
 			LogErr("getPage failed:%s\n", url);
+			runFailed = true;
 			continue;
 		}
-		//cout<<page;
 
 		//从页面解析号码
+		newItems.clear();
 		if (numUp.get_item_from_page(page, newItems) < 0)
 		{
 			LogErr("get_item_from_page failed\n");
+			runFailed = true;
 			continue;
 		}
 
 		//存入数据库
 		if (numUp.save_item_to_db(newItems) < 0)
 		{
-			continue;
-		}
-
-		//通知AI更新数据
-		LtAi& ltAi = LtAi::getInst();
-		ltAi.update_history();
-
-		if (numUp.generate_new_rand(webLastId + 2000000 - 1) < 0)
-		{
-			LogErr("generate_new_rand failed\n");
+			runFailed = true;
 			continue;
 		}
 	}

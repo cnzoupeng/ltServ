@@ -4,7 +4,11 @@
 
 #include <string>
 #include <vector>
+#include "mongo/client/dbclient.h"
+#include <boost/algorithm/string.hpp>
+
 using namespace std;
+using namespace mongo;
 
 class NumUpdate
 {
@@ -44,6 +48,7 @@ private:
 	string _dbAddr;
 	string _dbHisName;
 	string _dbRandName;
+	DBClientConnection _dbCon;
 };
 
 #endif

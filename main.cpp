@@ -5,39 +5,50 @@
 #include <string>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
 
-
+#include "numUpdate.h"
 #include "lottory.h"
 #include "combin.h"
 #include "cmRandom.h"
 #include "ltAi.h"
 #include "ltServ.h"
 #include "httpClient.h"
-#include "numUpdate.h"
+#include "ltCalendar.h"
+
 
 using namespace std;
-
+static bool thisAppDebug = false;
+static char logFile[256];
 
 void help_exit()
 {
 	printf("Useage:\n");
 	printf("\t-d      : debug model\n");
 	printf("\t-p port : listen port\n");
+	printf("\t-l logfile : log file name\n");
 	exit(0);
 }
 
 void parse_cmd(int argc, char* argv[])
 {
 	int result;
+	logFile[0] = 0;
 	opterr = 0;
-	while( (result = getopt(argc, argv, "dp:")) != -1 )
+	while( (result = getopt(argc, argv, "dp:l:")) != -1 )
 	{
 		switch(result)
 		{
 		case 'd':
-			dbgOn |= LOG_LV_DBG;
+			thisAppDebug = true;
 			break;
 		case 'p':			
+			break;
+		case 'l':		
+			strcpy(logFile, optarg);
 			break;
 		default:
 			help_exit();
@@ -48,6 +59,17 @@ void parse_cmd(int argc, char* argv[])
 
 void daemonize(void)
 {
+	int logFd = -1;
+	if (logFile[0] != 0)
+	{
+		logFd = open(logFile, O_CREAT | O_APPEND | O_RDWR);
+		if (logFd < 0)
+		{
+			LogErr("Open logFile failed:%s\n", logFile);			
+		}
+		LogMsg("LogFile:%s\n", logFile);
+	}
+
 	pid_t pid;
 	pid = fork();
 	if (pid < 0) {
@@ -61,9 +83,18 @@ void daemonize(void)
 
 	setsid();
 
-	close(0);
-	close(1);
-	close(2);
+	if (logFd >= 0)
+	{
+		close(STDIN_FILENO);		
+		close(STDERR_FILENO);
+		dup2(logFd, STDOUT_FILENO);
+	}
+	else
+	{
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
+	}
 
 	chdir("/");
 }
@@ -100,16 +131,33 @@ void rand_test()
 	exit(0);
 }
 
+void ltCalTest()
+{
+	LtCalen cal;
+	int ssqId = 2013053;
+	tm drawTime;
+	printf("getLastSsqId: %d\n", cal.getLastSsqId());
+
+	
+	if(cal.getDrawTimeOfId(ssqId, drawTime) < 0)
+	{
+		printf("getDrawTimeOfId failed\n");
+	}
+	drawTime.tm_year -= 1900;
+	time_t tmD = mktime(&drawTime);
+	printf("getDrawTimeOfId: %d : %s\n", ssqId, ::ctime(&tmD));
+	printf("getDrawTimeDist: %d\n", cal.getDrawTimeDist(ssqId));
+	exit(0);
+}
+
 
 int main(int argc, char* argv[]) 
 {
 	dbgOn = LOG_LV_ERR | LOG_LV_MSG | LOG_LV_DBG;
 
-
-
 	parse_cmd(argc, argv);
 
-	if (!(dbgOn & LOG_LV_DBG))
+	if (!thisAppDebug)
 	{
 		daemonize();
 	}	

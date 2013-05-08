@@ -95,12 +95,25 @@ int LtAi::update_history()
 	}
 
 	//Ωµ–Ú≈≈¡–
-	qSort.sort("id", -1);
-	qSort.minKey(BSONObjBuilder().append("id", curLast.no + 1).obj());
+	qSort.sort("id", 1);
+	dbCon.resetError();
 	std::auto_ptr<DBClientCursor> cursor = dbCon.query(_dbName , qSort);
+	string dberr = dbCon.getLastError();
+	if (!dberr.empty())
+	{
+		LogErr("Query obj failed: %s\n", dberr.c_str());
+		return -1;
+	}
+	
 	while ( cursor->more())
 	{
 		BSONObj obj = cursor->next();
+		if (!obj.isValid() || obj.isEmpty())
+		{
+			LogErr("Not valid obj\n");
+			continue;
+		}
+		
 		u32 objId = (u32)obj.getIntField("id");
 
 		if (objId > curLast.no)
@@ -114,12 +127,12 @@ int LtAi::update_history()
 				break;
 			}
 			_ltHis.push_back(item);
-			LogMsg("Update: %s\n", strItem.c_str());
+			LogMsg("LtAi Update: %s\n", strItem.c_str());
 			updateCount ++;
 		}
 		else
 		{
-			break;
+			continue;;
 		}
 	}
 
@@ -129,7 +142,20 @@ int LtAi::update_history()
 		return err;
 	}
 
-	LogMsg("%d records update\n", updateCount);
+	LogMsg("AiCore %d records update\n", updateCount);
+	return 0;
+}
+
+int LtAi::update_history(string num)
+{
+	Lottory item;
+	if (item.Set(num) < 0)
+	{
+		return -1;
+	}
+	_ltHis.push_back(item);
+	char strItem[64];
+	LogMsg("AiCore update: %s\n", item.toString(strItem, 64));
 	return 0;
 }
 

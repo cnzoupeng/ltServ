@@ -16,7 +16,7 @@ int HttpClient::getPage(const char* host, const char* path, string& page)
 	if (!httpStream)
 	{
 		//std::cout << "Unable to connect: " << httpStream.error().message()<< "\n";
-		std::cout << "Unable to connect: \n";
+		LogErr("Unable to connect: %s:\n", host);
 		return 1;
 	}
 
@@ -41,12 +41,12 @@ int HttpClient::getPage(const char* host, const char* path, string& page)
     std::getline(httpStream, status_message);
     if (!httpStream || http_version.substr(0, 5) != "HTTP/")
     {
-      std::cout << "Invalid response\n";
+      LogErr("Invalid response\n");
       return 1;
     }
     if (status_code != 200)
     {
-      std::cout << "Response returned with status code " << status_code << "\n";
+      LogErr("Response returned with status code:%d\n", status_code);
       return 1;
     }
 
@@ -57,7 +57,6 @@ int HttpClient::getPage(const char* host, const char* path, string& page)
 		//std::cout << header << "\n";
 	}
 
-    // Write the remaining data to output.
 	ostringstream oss;
 	oss << httpStream.rdbuf();
 	page = oss.str();

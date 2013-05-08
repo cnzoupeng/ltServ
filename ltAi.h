@@ -20,6 +20,8 @@ public:
 
 	int update_history();
 
+	int update_history(string num);
+
 	vector<Lottory>& getHis()
 	{
 		return _ltHis;
