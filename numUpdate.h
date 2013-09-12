@@ -2,13 +2,19 @@
 #ifndef __NUM__UPDATE_H__
 #define __NUM__UPDATE_H__
 
+#include "common.h"
 #include <string>
 #include <vector>
-#include "mongo/client/dbclient.h"
-#include <boost/algorithm/string.hpp>
-
+#include <map>
 using namespace std;
-using namespace mongo;
+
+#define HISTORY_FILE "./history.txt"
+
+struct HisItem
+{
+	int id;
+	char num[40];
+};
 
 class NumUpdate
 {
@@ -23,32 +29,27 @@ public:
 
 	int runLoop();
 
+	int get_range_str(int start, int stop, string& outStr);
+
 private:
-	NumUpdate();
+	NumUpdate(){};
 
 	~NumUpdate(){}
 
 	static void* run(void*);
 
-	int dbInit();
+	int load_from_file(const char* fileName = HISTORY_FILE);
+
+	int write_to_file(const char* fileName = HISTORY_FILE);
 
 	int get_xml_value(string& xml, char* value);
-
-	int get_last_id_from_db(int& lastId);
 
 	int get_last_id_from_html(string& page, int& lastId);
 
 	int get_item_from_page(string& page, vector<string>& items);
 
-	int save_item_to_db(vector<string>& items);
-
-	int generate_new_rand(int lastId);
-
-private:
-	string _dbAddr;
-	string _dbHisName;
-	string _dbRandName;
-	DBClientConnection _dbCon;
+	vector<HisItem> _history;
+	map<int, int>	_mapHisId;
 };
 
 #endif

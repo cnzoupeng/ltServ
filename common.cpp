@@ -1,6 +1,7 @@
 
 #include "common.h"
-#include <string.h>
+#include <cstring>
+#include <ctime>
 using namespace std;
 
 int dbgOn = 0;
@@ -57,5 +58,15 @@ void my_split(std::string& str, const char* delim, std::vector<std::string>& out
 	}
 }
 
-
+char* nowTime()
+{
+	static char tmStr[64];
+	time_t rawtime;	
+	struct tm * timeinfo;
+	time (&rawtime);
+	timeinfo = localtime (&rawtime);
+	sprintf(tmStr, "%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon + 1, timeinfo->tm_mday, 
+		timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+	return tmStr;
+}
 

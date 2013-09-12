@@ -7,8 +7,8 @@ SET(CMAKE_INSTALL_PREFIX ./bin)
 #ADD_DEFINITIONS(-g -Wall -Werror)
 ADD_DEFINITIONS(-g -Wall)
 
-INCLUDE_DIRECTORIES()
-LINK_DIRECTORIES()
+INCLUDE_DIRECTORIES(/home/work/boost_1_54_0)
+LINK_DIRECTORIES(/home/work/boost_1_54_0/stage/lib)
 
 AUX_SOURCE_DIRECTORY(. SRC_LIST)
 
@@ -20,5 +20,5 @@ AUX_SOURCE_DIRECTORY(. SRC_LIST)
 
 #for APP
 ADD_EXECUTABLE(ltServ ${SRC_LIST})
-TARGET_LINK_LIBRARIES(ltServ pthread mongoclient boost_thread-mt boost_filesystem boost_program_options boost_system)
+TARGET_LINK_LIBRARIES(ltServ pthread boost_filesystem boost_system)
 INSTALL(TARGETS ltServ RUNTIME DESTINATION ./bin)

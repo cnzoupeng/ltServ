@@ -14,15 +14,16 @@
 #include "lottory.h"
 #include "combin.h"
 #include "cmRandom.h"
-#include "ltAi.h"
-#include "ltServ.h"
 #include "httpClient.h"
 #include "ltCalendar.h"
-
+#include "netCore.h"
+#include "jobDisph.h"
 
 using namespace std;
 static bool thisAppDebug = false;
 static char logFile[256];
+static char workDir[256];
+static u16 tcpPort = 5000;
 
 void help_exit()
 {
@@ -30,6 +31,7 @@ void help_exit()
 	printf("\t-d      : debug model\n");
 	printf("\t-p port : listen port\n");
 	printf("\t-l logfile : log file name\n");
+	printf("\t-w dir : work dir\n");
 	exit(0);
 }
 
@@ -37,18 +39,23 @@ void parse_cmd(int argc, char* argv[])
 {
 	int result;
 	logFile[0] = 0;
+	workDir[0] = 0;
 	opterr = 0;
-	while( (result = getopt(argc, argv, "dp:l:")) != -1 )
+	while( (result = getopt(argc, argv, "dp:l:w:")) != -1 )
 	{
 		switch(result)
 		{
 		case 'd':
 			thisAppDebug = true;
 			break;
-		case 'p':			
+		case 'p':	
+			tcpPort = atoi(optarg);
 			break;
 		case 'l':		
 			strcpy(logFile, optarg);
+			break;
+		case 'w':		
+			strcpy(workDir, optarg);
 			break;
 		default:
 			help_exit();
@@ -96,7 +103,15 @@ void daemonize(void)
 		close(STDERR_FILENO);
 	}
 
-	chdir("/");
+	if (workDir[0] != 0)
+	{
+		chdir(workDir);
+	}
+	else
+	{
+		chdir("/");
+	}
+	
 }
 
 void rand_test()
@@ -160,20 +175,25 @@ int main(int argc, char* argv[])
 	if (!thisAppDebug)
 	{
 		daemonize();
-	}	
+	}
 
-	LtAi& aiCore = LtAi::getInst();
-	if (aiCore.load_history() < 0)
+	NetCore& netCore = NetCore::getInst();
+	if (netCore.init(tcpPort) < 0)
 	{
-		return -1;
+		return -1; 
 	}
 
 	NumUpdate& numup = NumUpdate::getInst();
 	numup.runBack();
 
-	LtServ serv(LISTEN_IP, LISTEN_PORT, aiCore);
-	serv.run_loop();
-		
+	JobDisph jobDph;
+	if (jobDph.run() < 0)
+	{
+		return -1;
+	}
+
+	netCore.runLopp();
+
 	return 0;
 }
 
